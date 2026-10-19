@@ -1,0 +1,8 @@
+node_modules
+newrelic_agent.log
+.vscode
+.history
+play.js
+.local
+.env
+firebase.json
