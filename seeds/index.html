@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <title>Page Title</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.0/css/bootstrap.min.css">
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.0/js/bootstrap.min.js"></script>
+    <script defer src="./lib/jquery.min.js"></script>
+    <!-- <script src="/socket.io/socket.io.js"></script> -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/2.0.4/socket.io.js"></script>
+    <script>
+      /* eslint-disable no-undef */
+      /* eslint-disable no-console */
+      /* eslint-disable prettier/prettier */
+     // eslint-disable-line no-undef
+      function auth() {
+        console.log('details', document.getElementById('sUserName').value)
+        const settings = {
+          'url': 'http://127.0.0.1:3000/api/v1/auth/login',
+          'method': 'POST',
+          'timeout': 0,
+          'headers': {
+            'Content-Type': 'application/json'
+          },
+          'data': JSON.stringify({'sUserName':document.getElementById('sUserName').value,'sPassword':document.getElementById('sPassword').value}),
+        };
+
+        $.ajax(settings).done(function (response) {
+          console.log(response);
+          if (response.data.sToken) {
+            localStorage.setItem('sToken', response.data.sToken);
+            window.alert(response.message)
+          }
+        });
+      }
+
+      function join() {
+        const settings = {
+          'url': 'http://127.0.0.1:3000/api/v1/sewali/table/join',
+          'method': 'POST',
+          'timeout': 0,
+          'headers': {
+            'Authorization': localStorage.getItem('sToken'),
+            'Content-Type': 'application/json'
+          },
+          'data': JSON.stringify({'sName':document.getElementById('sName').value,'nTableFee': document.getElementById('nTableFee').value,'eGameType': document.getElementById('eGameType').value}),
+        };
+
+        $.ajax(settings).done(function (response) {
+          console.log(response);
+          if (response.data.iTableId) {
+            localStorage.setItem('iTableId', response.data.iTableId.toString());
+            window.alert(response.message)
+            window.location.href = 'socketFile.html'
+          }
+        });
+      }
+    </script>
+  </head>
+  <body>
+  <div class="container">
+    <div id="login" class="jumbotron text-center">
+      <h2 class="text-center">Login</h2>
+        <form>
+          <label for="sUserName">sUserName :</label>
+          <input type="text" id="sUserName">
+          <label for="sPassword">sPassword :</label>
+          <input type="text" id="sPassword">
+          <button type="button" onclick="auth()">Login</button>
+        </form>
+      </div>
+      <div id="table" class="jumbotron text-center">
+      <h2 class="text-center">Join table</h2>
+        <form>
+          <label for="sName">sName :</label>
+          <input type="text" id="sName">
+          <label for="nTableFee">nTableFee :</label>
+          <input type="text" id="nTableFee">
+          <label for="eGameType">eGameType :</label>
+          <input type="text" id="eGameType">
+          <button type="button" onclick="join()">Join</button>
+        </form>
+      </div>
+  </div>
+  </body>
+</html>

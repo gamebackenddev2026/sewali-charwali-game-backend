@@ -1,0 +1,31 @@
+{
+    "extends": ["wesbos"],
+    "globals": {
+        "_": "readonly",
+        "message": "readonly",
+        "log": "readonly",
+        "emitter": "readonly",
+        "globalThis": "readonly"
+    },
+    "rules": {
+        "no-console": "off",
+        "max-lines": "off",
+        "prettier/prettier": [
+            "error",
+            {
+                "endOfLine": "auto",
+                "printWidth": 400,
+                "trailingComma": "es5",
+                "singleQuote": true,
+                "tabWidth": 4
+            }
+        ],
+        "prefer-destructuring": [
+            "error",
+            {
+                "object": true,
+                "array": false
+            }
+        ]
+    }
+}

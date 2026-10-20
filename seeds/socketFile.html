@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <title>Page Title</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <!-- <script src="/socket.io/socket.io.js"></script> -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/2.0.4/socket.io.js"></script>
+  </head>
+  <body>
+    <button onclick="joinMatch()">Join match</button>
+    <button onclick="syncHand()">sync hand</button>
+    <button onclick="declaredCard()">cards</button>
+    
+    <div>
+      <h4>reqJoinTable Event: </h4>
+      <p id="reqJoinTable"></p>
+      <h4>resUserJoined Event: </h4>
+      <p id="resUserJoined"></p>
+    </div>
+    <!-- <button onclick="reqClosedCard()">reqClosedCard</button> -->
+  </body>
+  <script>
+    /* eslint-disable no-undef */
+    /* eslint-disable no-console */
+    /* eslint-disable prettier/prettier */
+    const serverIp = 'localhost';
+    const socket = io.connect(`http://${serverIp}:3000`, {
+      // eslint-disable-line no-undef
+      query: { Authorization: localStorage.getItem('sToken') },
+    }); // eslint-disable-line no-undef
+
+    function joinMatch() {
+      console.log('joinMatch called 1...'); // eslint-disable-line no-console
+      socket.emit('reqJoinTable', { iTableId: localStorage.getItem('iTableId') }, function (error,data) {
+        if(error)console.log('error :: ',error)
+        // document.getElementById('reqJoinTable').innerHTML = JSON.stringify(data);
+        if(data)console.log('data from server :: ',data)
+      });
+    }
+
+    function syncHand() {
+      socket.emit(localStorage.getItem('iTableId'), {sEventName: 'reqSyncHand', oData : {}})
+    }
+
+    function declaredCard() {
+      socket.emit(localStorage.getItem('iTableId'), {sEventName: 'declaredCards', oData : {}})
+    }
+
+    socket.on(localStorage.getItem('iTableId'), (val) => {
+      // document.getElementById('resUserJoined').innerHTML = JSON.stringify(val);
+      console.log('data in on event :: ',val);
+    });
+
+    // socket.on('resUserJoined', (val) => {
+    //   document.getElementById('resUserJoined').innerHTML = JSON.stringify(val);
+    //   console.log('resUserJoined :: ', val);
+    // });
+
+    // socket.on('resInitializeTimer', (val) => {
+    //   console.log('resTimer ::', val);
+    // })
+  </script>
+</html>
