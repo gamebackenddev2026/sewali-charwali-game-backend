@@ -23,6 +23,7 @@ const Club = require('./lib/Club');
 const ClubMember = require('./lib/ClubMember');
 const ClubChat = require('./lib/ClubChat');
 const ClubJoinRequest = require('./lib/ClubJoinRequest');
+const ClubBlockedUser = require('./lib/ClubBlockedUser');
 const VipSubscription = require('./lib/VipSubscription');
 const VipSubscriptionUser = require('./lib/VipSubscriptionUser');
 const UserSession = require('./lib/UserSession');
@@ -57,6 +58,7 @@ module.exports = {
     ClubMember,
     ClubChat,
     ClubJoinRequest,
+    ClubBlockedUser,
     VipSubscription,
     VipSubscriptionUser,
     UserSession,

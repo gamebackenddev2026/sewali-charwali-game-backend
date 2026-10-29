@@ -1,5 +1,5 @@
 const mongoose = require('mongoose');
-const { Club, ClubMember, ClubChat, User, TableHistory, ClubJoinRequest } = require('../../../../models');
+const { Club, ClubMember, ClubChat, User, TableHistory, ClubJoinRequest, ClubBlockedUser, Settings } = require('../../../../models');
 const { mongodb, s3 } = require('../../../../utils');
 
 const controllers = {};
@@ -198,11 +198,20 @@ controllers.createClub = async (req, res) => {
         if (body.nMaxMembers && body.nMaxMembers < 1) return res.reply(message.invalid_req('Maximum members cannot be less than 1', req.query?.eLocale || 'en'));
         if (body.nMaxMembers && body.nMaxMembers > 100) return res.reply(message.invalid_req('Maximum members cannot be greater than 100', req.query?.eLocale || 'en'));
 
-        const owner = await User.findById(req.user._id).select('eBadges').lean();
+        const [owner, settings] = await Promise.all([
+            User.findById(req.user._id).select('eBadges nTotalCoins').lean(),
+            Settings.findOne({}, { nClubCreationFee: 1 }).lean(),
+        ]);
         const allowedLevels = getAllowedClubLevels(owner?.eBadges);
         const requestedLevel = String(body.eMinimumPlayerLevel || 'beginner').trim().toLowerCase();
         if (!allowedLevels.includes(requestedLevel)) {
             return res.reply(message.club_level_not_allowed_for_badge('', req.query?.eLocale || 'en'));
+        }
+        
+
+        const nClubCreationFee = Math.max(0, Number(settings?.nClubCreationFee) || 0);
+        if ((owner?.nTotalCoins || 0) < nClubCreationFee) {
+            return res.reply(message.insufficient_balance('', req.query?.eLocale || 'en'));
         }
 
         const profileResult = await resolveClubProfileInput(body, req.user._id, req.query?.eLocale || 'en', 'createClub');
@@ -210,6 +219,7 @@ controllers.createClub = async (req, res) => {
         const profile = profileResult?.profile || resolveClubProfile(body);
         log.yellow('createClub resolved profile', profile);
 
+        let nTotalCoins = owner?.nTotalCoins || 0;
         session = await mongoose.startSession();
         await session.withTransaction(async () => {
             const existingMembership = await ClubMember.findOne({
@@ -222,6 +232,16 @@ controllers.createClub = async (req, res) => {
             const existingClub = await Club.findOne({ sClubName: body.sClubName.trim() }).session(session);
 
             if (existingClub) return res.reply(message.already_exists('Club name', req.query?.eLocale || 'en'));
+
+            if (nClubCreationFee > 0) {
+                const updatedOwner = await User.findOneAndUpdate(
+                    { _id: req.user._id, nTotalCoins: { $gte: nClubCreationFee } },
+                    { $inc: { nTotalCoins: -nClubCreationFee } },
+                    { new: true, session, projection: { nTotalCoins: 1 } }
+                );
+                if (!updatedOwner) return res.reply(message.insufficient_balance('', req.query?.eLocale || 'en'));
+                nTotalCoins = updatedOwner.nTotalCoins;
+            }
 
             const clubData = {
                 sClubName: body.sClubName.trim(),
@@ -255,10 +275,17 @@ controllers.createClub = async (req, res) => {
                 sProfileImage: profile.sProfileImage,
                 sCountry: club[0].sCountry || '',
                 eMinimumPlayerLevel: club[0].eMinimumPlayerLevel || 'beginner',
+                nClubCreationFee,
+                nTotalCoins,
             });
         });
+        if (nClubCreationFee > 0 && nTotalCoins !== (owner?.nTotalCoins || 0)) {
+            _.privateEmit(req.user._id, 'resUpdateCoins', { nTotalCoins: parseInt(nTotalCoins, 10) });
+        }
     } catch (error) {
         return res.reply(message.server_error('', req.query?.eLocale || 'en'), error);
+    } finally {
+        if (session) await session.endSession();
     }
 };
 
@@ -448,6 +475,13 @@ controllers.joinClub = async (req, res) => {
             // Get club details
             const club = await Club.findOne({ _id: iClubIdObj, eStatus: 'y' }).session(session);
             if (!club) return res.reply(message.not_found('Club', req.query?.eLocale || 'en'));
+
+            const blocked = await ClubBlockedUser.findOne({
+                iClubId: iClubIdObj,
+                iUserId: req.user._id,
+                eStatus: 'blocked',
+            }).session(session);
+            if (blocked) return res.reply(message.club_user_blocked('', req.query?.eLocale || 'en'));
 
             // Check if club is public or requires approval
             if (!club.bIsPublic) {
@@ -1044,6 +1078,13 @@ controllers.respondToJoinRequest = async (req, res) => {
         const alreadyJoined = await ClubMember.findOne({ iUserId: joinRequest.iUserId, eStatus: 'active' }).session(session);
         if (alreadyJoined) return res.reply(message.the_user_joined_another_club('', req.query?.eLocale || 'en'));
         if (joinRequest.eStatus !== 'pending') return res.reply(message.invalid_req('Request already handled', req.query?.eLocale || 'en'));
+
+        const blocked = await ClubBlockedUser.findOne({
+            iClubId: iClubIdObj,
+            iUserId: joinRequest.iUserId,
+            eStatus: 'blocked',
+        }).lean();
+        if (blocked) return res.reply(message.club_user_blocked('', req.query?.eLocale || 'en'));
 
         if (body.action === 'reject') {
             await ClubJoinRequest.findByIdAndUpdate(iRequestIdObj, { $set: { eStatus: 'rejected', iHandledBy: req.user._id, dHandledAt: new Date() } });
@@ -1732,4 +1773,151 @@ controllers.getOwnClubProfile = async (req, res) => {
         return res.reply(message.server_error('', req.query?.eLocale || 'en'), error);
     }
 };
+
+// ==================== BLOCK / UNBLOCK APIs ====================
+
+controllers.blockUser = async (req, res) => {
+    try {
+        const { iClubId, iUserId } = req.params;
+        const body = _.pick(req.body, ['sReason']);
+        if (!iClubId) return res.reply(message.required_field('Club ID', req.query?.eLocale || 'en'));
+        if (!iUserId) return res.reply(message.required_field('User ID', req.query?.eLocale || 'en'));
+
+        const iClubIdObj = mongodb.mongify(iClubId);
+        const iUserIdObj = mongodb.mongify(iUserId);
+
+        if (iUserIdObj.toString() === req.user._id.toString()) {
+            return res.reply(message.cannot_block_yourself('', req.query?.eLocale || 'en'));
+        }
+
+        const [club, targetUser, targetMember] = await Promise.all([
+            Club.findOne({ _id: iClubIdObj, eStatus: 'y' }).lean(),
+            User.findById(iUserIdObj).select('_id sUserName sAvatar').lean(),
+            ClubMember.findOne({ iClubId: iClubIdObj, iUserId: iUserIdObj, eStatus: 'active' }).lean(),
+        ]);
+
+        if (!club) return res.reply(message.not_found('Club', req.query?.eLocale || 'en'));
+        if (!targetUser) return res.reply(message.not_found('User', req.query?.eLocale || 'en'));
+        if (club.iOwnerId.toString() === iUserIdObj.toString() || targetMember?.eRole === 'owner') {
+            return res.reply(message.cannot_block_club_owner('', req.query?.eLocale || 'en'));
+        }
+
+        const existingBlock = await ClubBlockedUser.findOne({ iClubId: iClubIdObj, iUserId: iUserIdObj }).lean();
+        if (existingBlock?.eStatus === 'blocked') {
+            return res.reply(message.user_already_blocked_from_club('', req.query?.eLocale || 'en'));
+        }
+
+        const block = await ClubBlockedUser.findOneAndUpdate(
+            { iClubId: iClubIdObj, iUserId: iUserIdObj },
+            {
+                $set: {
+                    iBlockedBy: req.user._id,
+                    sReason: body.sReason || '',
+                    eStatus: 'blocked',
+                    dBlockedAt: new Date(),
+                    dUnblockedAt: null,
+                },
+            },
+            { new: true, upsert: true, setDefaultsOnInsert: true }
+        );
+
+        if (targetMember) {
+            await ClubMember.findByIdAndUpdate(targetMember._id, { $set: { eStatus: 'removed' } });
+        }
+
+        await ClubJoinRequest.updateMany(
+            { iClubId: iClubIdObj, iUserId: iUserIdObj, eStatus: 'pending' },
+            { $set: { eStatus: 'rejected', iHandledBy: req.user._id, dHandledAt: new Date() } }
+        );
+
+        await emitRefreshClubMembers(iClubIdObj, iUserIdObj);
+        await _.privateEmit(iUserIdObj.toString(), 'resClubUserBlocked', {
+            iClubId: iClubIdObj.toString(),
+            sClubName: club.sClubName || '',
+            sReason: block.sReason || '',
+            dBlockedAt: block.dBlockedAt,
+        });
+
+        return res.reply(message.successfully('User blocked from club', req.query?.eLocale || 'en'), {
+            iClubId: iClubIdObj,
+            iUserId: iUserIdObj,
+            sUserName: targetUser.sUserName || '',
+            sAvatar: targetUser.sAvatar || '',
+            sReason: block.sReason || '',
+            eStatus: block.eStatus,
+            dBlockedAt: block.dBlockedAt,
+        });
+    } catch (error) {
+        log.error('blockUser error:', error);
+        return res.reply(message.server_error('', req.query?.eLocale || 'en'), error);
+    }
+};
+
+controllers.unblockUser = async (req, res) => {
+    try {
+        const { iClubId, iUserId } = req.params;
+        if (!iClubId) return res.reply(message.required_field('Club ID', req.query?.eLocale || 'en'));
+        if (!iUserId) return res.reply(message.required_field('User ID', req.query?.eLocale || 'en'));
+
+        const iClubIdObj = mongodb.mongify(iClubId);
+        const iUserIdObj = mongodb.mongify(iUserId);
+
+        const block = await ClubBlockedUser.findOne({ iClubId: iClubIdObj, iUserId: iUserIdObj, eStatus: 'blocked' });
+        if (!block) return res.reply(message.user_not_blocked_from_club('', req.query?.eLocale || 'en'));
+
+        block.eStatus = 'unblocked';
+        block.dUnblockedAt = new Date();
+        await block.save();
+
+        const club = await Club.findById(iClubIdObj).select('sClubName').lean();
+        await _.privateEmit(iUserIdObj.toString(), 'resClubUserUnblocked', {
+            iClubId: iClubIdObj.toString(),
+            sClubName: club?.sClubName || '',
+            dUnblockedAt: block.dUnblockedAt,
+        });
+
+        return res.reply(message.successfully('User unblocked from club', req.query?.eLocale || 'en'), {
+            iClubId: iClubIdObj,
+            iUserId: iUserIdObj,
+            eStatus: block.eStatus,
+            dUnblockedAt: block.dUnblockedAt,
+        });
+    } catch (error) {
+        log.error('unblockUser error:', error);
+        return res.reply(message.server_error('', req.query?.eLocale || 'en'), error);
+    }
+};
+
+controllers.listBlockedUsers = async (req, res) => {
+    try {
+        const { iClubId } = req.params;
+        if (!iClubId) return res.reply(message.required_field('Club ID', req.query?.eLocale || 'en'));
+
+        const iClubIdObj = mongodb.mongify(iClubId);
+        const body = _.pick(req.query, ['size', 'pageNumber']);
+        body.pageNumber = body.pageNumber ? parseInt(body.pageNumber, 10) : 0;
+        body.size = body.size ? parseInt(body.size, 10) : 20;
+        const skip = body.pageNumber * body.size;
+
+        const [blockedUsers, totalData] = await Promise.all([
+            ClubBlockedUser.find({ iClubId: iClubIdObj, eStatus: 'blocked' })
+                .sort({ dBlockedAt: -1 })
+                .skip(skip)
+                .limit(body.size)
+                .populate('iUserId', 'sUserName sAvatar nTotalCoins eBadges')
+                .populate('iBlockedBy', 'sUserName')
+                .lean(),
+            ClubBlockedUser.countDocuments({ iClubId: iClubIdObj, eStatus: 'blocked' }),
+        ]);
+
+        return res.reply(message.successfully('', req.query?.eLocale || 'en'), {
+            blockedUsers,
+            count: { totalData },
+        });
+    } catch (error) {
+        log.error('listBlockedUsers error:', error);
+        return res.reply(message.server_error('', req.query?.eLocale || 'en'), error);
+    }
+};
+
 module.exports = controllers;

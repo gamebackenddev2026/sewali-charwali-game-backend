@@ -225,5 +225,12 @@
 	"Failed to verify purchase with Google": "Failed to verify purchase with Google",
 	"Coins Purchased": "Coins Purchased",
 	"VIP Subscription Purchased": "VIP Subscription Purchased",
-	"You are already in this table": "You are already in this table"
+	"You are already in this table": "You are already in this table",
+	"You are blocked from this club": "आपको इस क्लब से ब्लॉक किया गया है",
+	"You cannot block yourself": "आप खुद को ब्लॉक नहीं कर सकते",
+	"You cannot block the club owner": "आप क्लब मालिक को ब्लॉक नहीं कर सकते",
+	"User is already blocked from this club": "उपयोगकर्ता पहले से इस क्लब से ब्लॉक है",
+	"User is not blocked from this club": "उपयोगकर्ता इस क्लब से ब्लॉक नहीं है",
+	"User blocked from club": "उपयोगकर्ता को क्लब से ब्लॉक किया गया",
+	"User unblocked from club": "उपयोगकर्ता को क्लब से अनब्लॉक किया गया"
 }

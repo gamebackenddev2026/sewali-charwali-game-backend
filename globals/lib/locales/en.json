@@ -222,5 +222,12 @@
 	"Failed to verify purchase with Google": "Failed to verify purchase with Google",
 	"Coins Purchased": "Coins Purchased",
 	"VIP Subscription Purchased": "VIP Subscription Purchased",
-	"You are already in this table": "You are already in this table"
+	"You are already in this table": "You are already in this table",
+	"You are blocked from this club": "You are blocked from this club",
+	"You cannot block yourself": "You cannot block yourself",
+	"You cannot block the club owner": "You cannot block the club owner",
+	"User is already blocked from this club": "User is already blocked from this club",
+	"User is not blocked from this club": "User is not blocked from this club",
+	"User blocked from club": "User blocked from club",
+	"User unblocked from club": "User unblocked from club"
 }

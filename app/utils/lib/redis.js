@@ -21,6 +21,13 @@ RedisClient.prototype.initialize = function () {
     this.publisher = redis.createClient(this.options);
     this.subscriber = redis.createClient(this.options);
 
+    const onError = (label) => (error) => {
+        console.error(`Redis ${label} error:`, error.message);
+    };
+    this.redisClient.on('error', onError('client'));
+    this.publisher.on('error', onError('publisher'));
+    this.subscriber.on('error', onError('subscriber'));
+
     // f (process.env.NODE_ENV !== 'prod') this.redisClient.config('SET', 'notify-keyspace-events', 'Ex'); // TODO -> move to setupConfig
     try {
         if (process.env.NODE_ENV !== 'prod') this.redisClient.config('SET', 'notify-keyspace-events', 'Ex');

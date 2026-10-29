@@ -82,6 +82,11 @@ const builder = {
     the_user_joined_another_club: (prefix, locale = 'en') => builder.prepare(419, globalThis.i18n.__({ phrase: prefix, locale }), globalThis.i18n.__({ phrase: 'The User joined another club', locale })),
     club_level_not_allowed_for_badge: (prefix, locale = 'en') =>
         builder.prepare(403, globalThis.i18n.__({ phrase: prefix, locale }), globalThis.i18n.__({ phrase: 'You cannot set this club level with your current badge', locale })),
+    club_user_blocked: (prefix, locale = 'en') => builder.prepare(403, globalThis.i18n.__({ phrase: prefix, locale }), globalThis.i18n.__({ phrase: 'You are blocked from this club', locale })),
+    cannot_block_yourself: (prefix, locale = 'en') => builder.prepare(403, globalThis.i18n.__({ phrase: prefix, locale }), globalThis.i18n.__({ phrase: 'You cannot block yourself', locale })),
+    cannot_block_club_owner: (prefix, locale = 'en') => builder.prepare(403, globalThis.i18n.__({ phrase: prefix, locale }), globalThis.i18n.__({ phrase: 'You cannot block the club owner', locale })),
+    user_already_blocked_from_club: (prefix, locale = 'en') => builder.prepare(409, globalThis.i18n.__({ phrase: prefix, locale }), globalThis.i18n.__({ phrase: 'User is already blocked from this club', locale })),
+    user_not_blocked_from_club: (prefix, locale = 'en') => builder.prepare(404, globalThis.i18n.__({ phrase: prefix, locale }), globalThis.i18n.__({ phrase: 'User is not blocked from this club', locale })),
 };
 
 Object.defineProperty(builder, 'prepare', {

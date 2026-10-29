@@ -60,6 +60,9 @@ const Settings = new mongoose.Schema({
     nDailyChallengeCount: { type: Number, default: 1 },
     nWeeklyChallengeCount: { type: Number, default: 1 },
 
+    // Global club creation fee (admin-managed; same for every club)
+    nClubCreationFee: { type: Number, default: 0, min: 0 },
+
     // VIP configuration
     nVipWinPercent: { type: Number, default: 0 },
     nVipBonusPercent: { type: Number, default: 0 },

@@ -11,6 +11,10 @@ if (process.env.REDIS_PASSWORD && process.env.REDIS_PASSWORD.trim() !== '') {
 }
 const redis = new IOREDIS(redisOptions);
 
+redis.on('error', (error) => {
+    console.error('Redis[redLock] error:', error.message);
+});
+
 async function initialize() {
     redis.on('ready', async () => {
         console.log('\x1b[32m%s\x1b[0m', 'Redis[redLock] is connected');

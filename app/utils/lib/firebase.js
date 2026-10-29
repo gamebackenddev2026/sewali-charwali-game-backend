@@ -1,11 +1,19 @@
 /* eslint-disable no-console */
+const fs = require('fs');
+const path = require('path');
 const admin = require('firebase-admin');
 const url = require('url');
-const config = require('../../../firebase.json');
 
-admin.initializeApp({
-    credential: admin.credential.cert(config),
-});
+const configPath = path.join(__dirname, '../../../firebase.json');
+if (fs.existsSync(configPath)) {
+    // eslint-disable-next-line import/no-dynamic-require, global-require
+    const config = require(configPath);
+    admin.initializeApp({
+        credential: admin.credential.cert(config),
+    });
+} else {
+    console.warn('firebase.json not found; Firebase Admin is disabled');
+}
 
 const operations = {};
 

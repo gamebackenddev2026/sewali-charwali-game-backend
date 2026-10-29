@@ -10,6 +10,12 @@ router.post('/update/profile/:iClubId', middleware.isClubOwner, controllers.upda
 // router.get('/my-club', controllers.getMyClub);
 router.get('/list', controllers.listClubs);
 router.get('/search', controllers.listClubs);
+
+// Block / unblock (owner only) — before /:iClubId so "blocked" is not treated as an id
+router.post('/block/:iClubId/:iUserId', middleware.isClubOwner, controllers.blockUser);
+router.post('/unblock/:iClubId/:iUserId', middleware.isClubOwner, controllers.unblockUser);
+router.get('/blocked/:iClubId', middleware.isClubOwner, controllers.listBlockedUsers);
+
 router.get('/:iClubId', controllers.getClub);
 router.put('/update/:iClubId', middleware.isClubOwner, controllers.updateClub);
 router.post('/delete/:iClubId', middleware.isClubOwner, controllers.deleteClub);

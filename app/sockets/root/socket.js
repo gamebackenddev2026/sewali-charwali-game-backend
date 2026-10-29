@@ -8,6 +8,12 @@ const Socket = function () {};
 Socket.prototype.init = function () {
     globalThis.io.origins('*:*');
     globalThis.io.adapter(redis.getAdapter());
+    const adapter = globalThis.io.of('/').adapter;
+    if (adapter && typeof adapter.on === 'function') {
+        adapter.on('error', (error) => {
+            console.error('socket.io-redis error:', error.message);
+        });
+    }
     this.setEventListeners();
 };
 
